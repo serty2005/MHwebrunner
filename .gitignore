@@ -1,0 +1,5 @@
+/.env
+/.venv
+/app.log
+/test.db
+/__pycache__
