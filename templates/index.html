@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Компании</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.3/css/bulma.min.css">
+    <script>
+        function connectTeamviewer(teamviewerId) {
+            var passwordField = document.getElementById("password-teamviewer-" + teamviewerId);
+            var password = passwordField.value;
+            var url = "clearbat://teamviewer@" + teamviewerId + ":" + password;
+            window.location.href = url;
+            passwordField.value = ""; // Очистка поля ввода
+        }
+
+        function connectAnydesk(anydeskId) {
+            var passwordField = document.getElementById("password-anydesk-" + anydeskId);
+            var password = passwordField.value;
+            var url = "clearbat://anydesk@" + anydeskId + ":" + password;
+            window.location.href = url;
+            passwordField.value = ""; // Очистка поля ввода
+        }
+
+        function connectIiko(ipId) {
+            var passwordField = document.getElementById("password-iiko-" + ipId);
+            var password = passwordField.value;
+            var url = "clearbat://iiko@" + ipId + ":443@MH:" + password;
+            window.location.href = url;
+            passwordField.value = ""; // Очистка поля ввода
+        }
+    </script>
+</head>
+<body>
+<section class="section">
+    <div class="container">
+        <h1 class="title">Компании</h1>
+        <div class="columns is-multiline">
+            {% for company in companies %}
+            <div class="column is-one-third">
+                <div class="box {% if company.active_contract == 0 %}has-background-grey-lighter{% endif %}">
+                    <h2 class="subtitle">{{ company.title }}</h2>
+                    <h3 class="subtitle">Оборудование:</h3>
+                    {% for server in company.servers %}
+                    <div class="box">
+                        <p><strong>Сервер:</strong></p>
+                        <p>UID: {{ server.unique_id }}</p>
+                        <p>Имя: {{ server.device_name }}</p>
+                    </div>
+                    {% endfor %}
+                    {% for workstation in company.workstations %}
+                    <div class="box">
+                        <p><strong>Рабочая станция:</strong></p>
+                        <p>Имя: {{ workstation.device_name }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+</body>
+</html>

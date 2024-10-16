@@ -13,18 +13,21 @@ class Company(Base):
     address = Column(String)
     uuid = Column(String, unique=True)
     title = Column(String)
+    active_contract = Column(Boolean)
     last_modified_date = Column(DateTime)
     additional_name = Column(String)
     parent_uuid = Column(String, ForeignKey('companies.uuid'), nullable=True)
     parent = relationship("Company", remote_side=[uuid])
+ 
 
 # Модель для контракта
 class Agreement(Base):
     __tablename__ = 'agreements'
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    uuid = Column(String, unique=True)
+    uuid = Column(String)
     title = Column(String)
     meta_class = Column(String)
+    state = Column(Boolean)
     company_id = Column(String, ForeignKey('companies.uuid'))
     company = relationship("Company", back_populates="agreements")
 
@@ -53,6 +56,7 @@ class Server(Base):
     anydesk = Column(String)
     uuid = Column(String, unique=True)
     ip = Column(String)
+    server_type = Column(String)
     cabinet_link = Column(String)
     owner_id = Column(String, ForeignKey('companies.uuid'))
     device_name = Column(String)
@@ -78,10 +82,8 @@ class Workstation(Base):
 # Настройка подключения к базе данных
 DATABASE_URL = "sqlite:///./test.db"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Создание таблиц
 Base.metadata.create_all(bind=engine)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Пример использования сессии для добавления данных
 if __name__ == "__main__":
