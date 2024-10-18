@@ -1,5 +1,5 @@
 /.env
 /.venv
-/app.log
-/test.db
+*/*.log
+/*.db
 /__pycache__

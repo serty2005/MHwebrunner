@@ -1,6 +1,8 @@
-import re
-import httpx
-import xml.etree.ElementTree as ET
+import re, os
+import logging
+
+# Настройка логирования
+logger = logging.getLogger("ServiceDeskLogger")
 
 # Определение паттернов для поиска серверов
 IIKO_IT_PATTERN = r'^(https?://)?([a-zA-Z0-9-]+\.)?([a-zA-Z0-9-]+\.iiko\.it)'
@@ -8,90 +10,98 @@ SYRVE_ONLINE_PATTERN = r'^(https?://)?([a-zA-Z0-9-]+\.)?([a-zA-Z0-9-]+\.syrve\.o
 CABINET_LINK_PATTERN = r'https://partners\.iiko\.ru/(ru|en)/cabinet/clients\.html\?mode=showOne&id='
 REMOTE_ACCESS_ID_PATTERN = r'(\d\s*){9,10}'
 
-# Асинхронная функция для получения информации о сервере
-async def get_server_info(server_ip: str) -> str:
-    url = f"{server_ip}/resto/get_server_info.jsp?encoding=UTF-8"
-    print(f"Запрос информации о сервере по URL: {url}")
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, timeout=2)
-            response.raise_for_status()
-            root = ET.fromstring(response.content)
-            edition = root.find('edition').text
-            if edition == 'default':
-                print(f"Сервер {server_ip} определен как 'iikoOffice'")
-                return 'iikoOffice'
-            elif edition == 'chain':
-                print(f"Сервер {server_ip} определен как 'iikoChain'")
-                return 'iikoChain'
-            else:
-                return 'Unknown Edition'
-
-    except httpx.TimeoutException:
-        print(f"Превышено время ожидания запроса к серверу {server_ip}")
-        return 'offline'
-    except httpx.RequestError as e:
-        print(f"Ошибка при выполнении запроса к серверу {server_ip}: {e}")
-        return 'offline'
-    except httpx.HTTPStatusError as e:
-        print(f"HTTP ошибка при обращении к серверу {server_ip}: {e.response.status_code}")
-        return 'offline'
-    except ET.ParseError:
-        print(f"Ошибка парсинга XML ответа от сервера {server_ip}")
-        return 'offline'
-    except Exception as e:
-        print(f"Неизвестная ошибка при обращении к серверу {server_ip}: {e}")
-        return 'offline'
-
-async def clearify_server_data(data: dict) -> dict:
-    print(f"Начало валидации данных сервера UUID: {data.get('UUID')}")
-    # Подготовка ссылки на сервер (поле IP)
-    server_link = data.get('IP', '')
-    if server_link and ('.iiko.it' in server_link or '.syrve.online' in server_link):
-        if '.iiko.it' in server_link:
-            cloud_match = re.search(IIKO_IT_PATTERN, server_link)
-        elif '.syrve.online' in server_link:
-            cloud_match = re.search(SYRVE_ONLINE_PATTERN, server_link)
-        else:
-            cloud_match = None
-        if cloud_match:
-            server_link = cloud_match.group(3)
-            server_type = await get_server_info(f"https://{server_link}")
-            data['server_type'] = server_type
-            if server_type != 'offline':
-                data['IP'] = server_link
-    else:
-        lt_match = re.search(r'(\d+\.\d+\.\d+\.\d+)(:(\d+))?', server_link)
-        if lt_match:
-            lt_link = f'{lt_match.group(1)}:{lt_match.group(3)}'
-            server_type = await get_server_info(lt_link)
-            data['server_type'] = server_type
-            if server_type != 'offline':
-                data['IP'] = lt_link
-        else:
-            data['server_type'] = 'unknown'
-            print(f"Не удалось распознать формат IP адреса сервера UUID {data.get('UUID')}")
-
-
-    # Подготовка ссылки на кабинет
-    cabinet_link = data.get('cabinet_link', '')
+# Функция для подготовки ссылки на партнерский кабинет
+def validate_cabinet_link(cabinet_link: str) -> str:
     if isinstance(cabinet_link, str) and re.match(CABINET_LINK_PATTERN, cabinet_link):
-        cabinet_link = re.sub(
+        updated_link = re.sub(
             CABINET_LINK_PATTERN, 
-            'https://partners.iiko.ru/v2/ru/cabinet/client-area/index.html?clientId=', cabinet_link
+            'https://partners.iiko.ru/v2/ru/cabinet/client-area/index.html?clientId=',
+            cabinet_link
         )
-        print(f"Ссылка на кабинет обновлена для сервера UUID {data.get('UUID')}: {cabinet_link}")
- 
-    data['cabinet_link'] = cabinet_link
+        logger.info(f"Ссылка на кабинет обновлена: {updated_link}")
+        return updated_link
+    return cabinet_link
 
-    # Подготовка UID
-    unique_id = data.get('UniqueID', '')
+# Функция для создания ссылки на объект в ServiceDesk
+def generate_servicedesk_link(uuid: str) -> str:
+    base_url = os.getenv("BASE_URL")
+    if base_url:
+        servicedesk_link = f"{base_url}/operator/#uuid:{uuid}"
+        logger.info(f"Создана ссылка на ServiceDesk: {servicedesk_link}")
+        return servicedesk_link
+    logger.error("BASE_URL не задана в переменных окружения")
+    return ""
+
+# Функция для проверки и валидации UniqueID
+def validate_unique_id(unique_id: str) -> str:
     if unique_id is None or not isinstance(unique_id, str) or not re.match(r'^\d{3}-\d{3}-\d{3}$', unique_id):
-        data['UniqueID'] = 'NotSet'   
-        print(f"UID не задан или имеет неверный формат для сервера UUID {data.get('UUID')}")
-    else:
-        print(f"UID корректен для сервера UUID {data.get('UUID')}: {data['UniqueID']}")
+        logger.warning(f"UID не задан или имеет неверный формат: {unique_id}")
+        return 'NotSet'
+    logger.info(f"UID корректен: {unique_id}")
+    return unique_id
 
-    print(f"Валидация данных сервера UUID {data.get('UUID')} завершена")
+# Функция для очистки удаленных доступов (Teamviewer, AnyDesk)
+def validate_remote_access_id(access_id_raw: str) -> str:
+    match_id = None
+    if access_id_raw:
+        match_id = re.search(REMOTE_ACCESS_ID_PATTERN, access_id_raw)
+    if match_id:
+        access_id = match_id.group(0)
+    else:
+        logging.error(f"Invalid remote ID: {access_id_raw}")
+        access_id = None
+    return access_id
+
+
+def validate_ip_address(ip_address: str) -> str:
+    if ip_address and ('.iiko.it' in ip_address or '.syrve.online' in ip_address):
+        # Обработка облачных серверов
+        if '.iiko.it' in ip_address:
+            match_ip = re.search(IIKO_IT_PATTERN, ip_address)
+        elif '.syrve.online' in ip_address:
+            match_ip = re.search(SYRVE_ONLINE_PATTERN, ip_address)
+        else:
+            match_ip = None
+        if match_ip:
+            domain = match_ip.group(3)
+            updated_ip = f"{domain}:443"
+            logger.info(f"Облачный IP преобразован: {updated_ip}")
+            return updated_ip
+    else:
+        # Обработка локальных серверов
+        match_ip = re.search(r'(\d+\.\d+\.\d+\.\d+)(:(\d+))?', ip_address) if ip_address else None
+        if match_ip:
+            ip = match_ip.group(1)
+            port = match_ip.group(3) if match_ip.group(3) else '8080'  # По умолчанию используем порт 80
+            updated_ip = f"{ip}:{port}"
+            logger.info(f"Локальный IP преобразован: {updated_ip}")
+            return updated_ip
+        else:
+            logger.warning(f"Не удалось распознать формат IP адреса: {ip_address}")
+    return ip_address
+
+
+# Основная функция для валидации данных
+async def clearify_data(data: dict) -> dict:
+    logger.info(f"Начало валидации данных объекта UUID: {data.get('UUID')}")
     
+    # Подготовка ссылки на партнерский кабинет
+    data['CabinetLink'] = validate_cabinet_link(data.get('CabinetLink', ''))
+    
+    # Создание ссылки на объект в ServiceDesk
+    data['ServiceDeskLink'] = generate_servicedesk_link(data.get('UUID', ''))
+    
+    # Проверка UID
+    data['UniqueID'] = validate_unique_id(data.get('UniqueID', ''))
+
+    # Проверка IP
+    data['IP'] = validate_ip_address(data.get('IP', ''))
+    
+    # Очистка удаленных доступов (Teamviewer, AnyDesk, RDP)
+    remote_access_fields = ['Teamviewer', 'AnyDesk', 'RDP']
+    for field in remote_access_fields:
+        if data.get(field):
+            data[field] = validate_remote_access_id(data[field])
+    
+    logger.info(f"Валидация данных объекта UUID {data.get('UUID')} завершена")
     return data

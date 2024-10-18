@@ -18,7 +18,7 @@ class Company(Base):
     additional_name = Column(String)
     parent_uuid = Column(String, ForeignKey('companies.uuid'), nullable=True)
     parent = relationship("Company", remote_side=[uuid])
- 
+
 
 # Модель для контракта
 class Agreement(Base):
