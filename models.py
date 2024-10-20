@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, String, Integer, DateTime, Boolean, ForeignKey
+from sqlalchemy import create_engine, Column, String, DateTime, Boolean, ForeignKey
 from sqlalchemy.orm import sessionmaker, relationship, declarative_base
 import uuid
 
@@ -19,32 +19,6 @@ class Company(Base):
     parent_uuid = Column(String, ForeignKey('companies.uuid'), nullable=True)
     parent = relationship("Company", remote_side=[uuid])
 
-
-# Модель для контракта
-class Agreement(Base):
-    __tablename__ = 'agreements'
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    uuid = Column(String)
-    title = Column(String)
-    meta_class = Column(String)
-    state = Column(Boolean)
-    company_id = Column(String, ForeignKey('companies.uuid'))
-    company = relationship("Company", back_populates="agreements")
-
-Company.agreements = relationship("Agreement", order_by=Agreement.id, back_populates="company")
-
-# Модель для оборудования
-class Equipment(Base):
-    __tablename__ = 'equipment'
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    uuid = Column(String, unique=True)
-    title = Column(String)
-    meta_class = Column(String)
-    company_id = Column(String, ForeignKey('companies.uuid'))
-    company = relationship("Company", back_populates="equipment")
-
-Company.equipment = relationship("Equipment", order_by=Equipment.id, back_populates="company")
-
 # Модель для сервера
 class Server(Base):
     __tablename__ = 'servers'
@@ -56,13 +30,13 @@ class Server(Base):
     anydesk = Column(String)
     uuid = Column(String, unique=True)
     ip = Column(String)
-    server_type = Column(String)
-    cabinet_link = Column(String)
-    owner_id = Column(String, ForeignKey('companies.uuid'))
+    cabinet_link = Column(String)  
     device_name = Column(String)
     last_modified_date = Column(DateTime)
-    cloud = Column(Boolean)
+    litemanager = Column(String)
     iiko_version = Column(String)
+    description = Column(String)
+    owner_id = Column(String, ForeignKey('companies.uuid'))
     owner = relationship("Company")
 
 # Модель для рабочей станции
@@ -73,10 +47,11 @@ class Workstation(Base):
     commentary = Column(String)
     teamviewer = Column(String)
     anydesk = Column(String)
-    owner_id = Column(String, ForeignKey('companies.uuid'))
+    litemanager = Column(String)
     device_name = Column(String)
     last_modified_date = Column(DateTime)
     uuid = Column(String, unique=True)
+    owner_id = Column(String, ForeignKey('companies.uuid'))
     owner = relationship("Company")
 
 # Настройка подключения к базе данных

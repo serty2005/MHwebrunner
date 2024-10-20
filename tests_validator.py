@@ -1,6 +1,6 @@
 import asyncio
 
-from data_validator import clearify_data  # Импортируем функцию из нашего модуля
+from data_validator import clearify_server_data  # Импортируем функцию из нашего модуля
 
 # Примеры тестовых данных
 test_data_list = [
@@ -9,7 +9,7 @@ test_data_list = [
         "IP": "https://mycompany.iiko.it/server",
         "CabinetLink": "https://partners.iiko.ru/ru/cabinet/clients.html?mode=showOne&id=12345",
         "UniqueID": "123-456-789",
-        "Teamviewer": "123 456 789 000",
+        "Teamviewer": "Пароль от учётки Windows 27042018 \n MH_10552",
         "AnyDesk": "987654321",
         "RDP": "RDP1234567890"
     },
@@ -19,7 +19,7 @@ test_data_list = [
         "CabinetLink": "https://partners.iiko.ru/en/cabinet/clients.html?mode=showOne&id=98765",
         "UniqueID": None,
         "Teamviewer": "TV ID 1122334455",
-        "AnyDesk": "anydesk_1234",
+        "AnyDesk": "302273084 Zz89852228558",
         "RDP": ""
     }
 ]
@@ -28,7 +28,7 @@ test_data_list = [
 async def test_clearify_server_data():
     for idx, test_data in enumerate(test_data_list):
         print(f"==== Тест №{idx + 1} ====")
-        validated_data = await clearify_data(test_data)
+        validated_data = await clearify_server_data(test_data)
         print("Результат валидации:", validated_data)
         print("=====================\n")
 

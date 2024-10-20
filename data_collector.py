@@ -1,8 +1,8 @@
 import httpx
 import os
 import asyncio
-from models import Company, Equipment, Server, Workstation, SessionLocal
-from data_validator import clearify_data
+from models import Company, Server, Workstation, SessionLocal
+from data_validator import clearify_server_data, clearify_pos_data
 import datetime
 from log import setup_logger
 import logging
@@ -12,8 +12,6 @@ load_dotenv()
 # Настройка логирования
 setup_logger(console_logging=False)
 logger = logging.getLogger("ServiceDeskLogger")
-
-# Загрузка переменных окружения из .env файла
 
 # Получение значений переменных окружения
 BASE_API_URL = f"{os.getenv('BASE_URL')}/services/rest/"
@@ -89,7 +87,7 @@ async def process_equipment(client, equipment_data, company, session):
     if equipment_data['metaClass'] == 'objectBase$Server':
         equipment_params = {
             "accessKey": ACCESS_KEY,
-            "attrs": "UniqueID,Teamviewer,RDP,AnyDesk,UUID,IP,CabinetLink,DeviceName,lastModifiedDate,Cloud,iikoVersion"
+            "attrs": "UniqueID,Teamviewer,RDP,AnyDesk,UUID,IP,CabinetLink,DeviceName,lastModifiedDate,iikoVersion,description,nameforclient"
         }
     elif equipment_data['metaClass'] == 'objectBase$Workstation':
         equipment_params = {
@@ -102,7 +100,6 @@ async def process_equipment(client, equipment_data, company, session):
     response = await client.get(equipment_url, params=equipment_params)
     if response.status_code == 200:
         equipment_info = response.json()
-        last_modified_date = datetime.datetime.strptime(equipment_info['lastModifiedDate'], "%Y.%m.%d %H:%M:%S")
 
         if equipment_data['metaClass'] == 'objectBase$Server':
             server = Server(
@@ -114,9 +111,13 @@ async def process_equipment(client, equipment_data, company, session):
                 anydesk=equipment_info.get('AnyDesk', None),
                 ip=equipment_info.get('IP', None),
                 cabinet_link=equipment_info.get('CabinetLink', None),
-                cloud=equipment_info.get('Cloud', False) == True,
                 iiko_version=equipment_info.get('iikoVersion', None),
-                last_modified_date=last_modified_date,
+                last_modified_date=datetime.datetime.strptime(equipment_info['lastModifiedDate'], "%Y.%m.%d %H:%M:%S"),
+                description='{} {}'.format(
+                    equipment_info.get('nameforclient', None),
+                    equipment_info.get('RDP', None),
+                    equipment_info.get('description', None)
+                ),
                 owner=company
             )
             session.add(server)
@@ -128,7 +129,7 @@ async def process_equipment(client, equipment_data, company, session):
                 teamviewer=equipment_info.get('Teamviewer', None),
                 anydesk=equipment_info.get('AnyDesk', None),
                 commentary=equipment_info.get('Commentariy', None),
-                last_modified_date=last_modified_date,
+                last_modified_date=datetime.datetime.strptime(equipment_info['lastModifiedDate'], "%Y.%m.%d %H:%M:%S"),
                 owner=company
             )
             session.add(workstation)
@@ -136,44 +137,56 @@ async def process_equipment(client, equipment_data, company, session):
 
 async def validate_servers():
     logger.info("Начинается процесс валидации серверов")
-    async with httpx.AsyncClient() as client:
-        with SessionLocal() as session:
-            servers = session.query(Server).all()
-            tasks = []
-            for server in servers:
-                logger.debug(f"Запуск валидации сервера UUID: {server.uuid}")
-                tasks.append(validate_server_data(client, server, session))
-            await asyncio.gather(*tasks)
-            session.commit()
+    with SessionLocal() as session:
+        servers = session.query(Server).all()
+        tasks = []
+        for server in servers:
+            logger.debug(f"Запуск валидации сервера UUID: {server.uuid}")
+            tasks.append(validate_server_data(server, session))
+        await asyncio.gather(*tasks)
+        session.commit()
     logger.info("Процесс валидации серверов завершен")
 
-async def validate_server_data(client, server, session):
+async def validate_workstations():
+    logger.info("Начинается процесс валидации рабочих станций")
+    with SessionLocal() as session:
+        workstations = session.query(Workstation).all()
+        tasks = []
+        for workstation in workstations:
+            logger.debug(f"Запуск валидации рабочей станции UUID: {workstation.uuid}")
+            tasks.append(validate_workstation_data(workstation, session))
+        await asyncio.gather(*tasks)
+        session.commit()
+    logger.info("Процесс валидации рабочих станций завершен")
+
+async def validate_server_data(server, session):
     try:
         data = {
-            'UUID': server.uuid,
-            'DeviceName': server.device_name,
             'UniqueID': server.unique_id,
             'Teamviewer': server.teamviewer,
+            'UUID': server.uuid,
             'RDP': server.rdp,
             'AnyDesk': server.anydesk,
             'IP': server.ip,
             'CabinetLink': server.cabinet_link,
-            'Cloud': server.cloud,
-            'iikoVersion': server.iiko_version,
-            'lastModifiedDate': server.last_modified_date.strftime("%Y.%m.%d %H:%M:%S"),
+            'litemanager_raw': server.description,
+            'litemanager': server.litemanager,
         }
 
         logger.debug(f"Валидация сервера UUID: {server.uuid}, данные до валидации: {data}")
 
         # Вызов clearify_server_data
-        updated_data = await clearify_data(data)
+        updated_data = await clearify_server_data(data)
 
         logger.debug(f"Сервер UUID: {server.uuid}, данные после валидации: {updated_data}")
 
         # Обновление объекта сервера с валидированными данными
         server.unique_id = updated_data.get('UniqueID', server.unique_id)
-        server.server_type = updated_data.get('server_type', server.server_type)
         server.cabinet_link = updated_data.get('CabinetLink', server.cabinet_link)
+        server.teamviewer = updated_data.get('Teamviewer', server.teamviewer)
+        server.rdp = updated_data.get('RDP', server.rdp)
+        server.anydesk = updated_data.get('AnyDesk', server.anydesk)
+        server.litemanager = updated_data.get('litemanager', server.litemanager)
 
         if updated_data.get('IP') != server.ip:
             logger.debug(f"Обновление IP для сервера UUID {server.uuid}: {server.ip} -> {updated_data['IP']}")
@@ -184,13 +197,41 @@ async def validate_server_data(client, server, session):
     except Exception as e:
         logger.error(f"Валидация сервера UUID: {server.uuid} завершилась с ошибкой: {e}")
 
-# Основной код, который можно запустить для инициализации
+async def validate_workstation_data(workstation, session):
+    try:
+        data = {
+            'Teamviewer': workstation.teamviewer,
+            'UUID': workstation.uuid,
+            'AnyDesk': workstation.anydesk,
+            'litemanager_raw': workstation.commentary,
+            'litemanager': workstation.litemanager,
+            'UUID': workstation.uuid,
+        }
+
+        logger.debug(f"Валидация рабочей станции UUID: {workstation.uuid}, данные до валидации: {data}")
+
+        # Вызов clearify_workstation_data
+        updated_data = await clearify_pos_data(data)
+
+        logger.debug(f"Рабочая станция UUID: {workstation.uuid}, данные после валидации: {updated_data}")
+
+        # Обновление объекта рабочей станции с валидированными данными
+        workstation.teamviewer = updated_data.get('Teamviewer', workstation.teamviewer)
+        workstation.anydesk = updated_data.get('AnyDesk', workstation.anydesk)
+        workstation.litemanager = updated_data.get('litemanager', workstation.litemanager)
+
+        session.add(workstation)
+
+    except Exception as e:
+        logger.error(f"Валидация рабочей станции UUID: {workstation.uuid} завершена с ошибкой: {e}")
+
 def main():
     asyncio.run(run_all())
 
 async def run_all():
     # await initialize_database()
     await validate_servers()
+    await validate_workstations()
 
 if __name__ == "__main__":
     main()
