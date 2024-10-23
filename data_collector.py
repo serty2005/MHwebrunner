@@ -6,7 +6,10 @@ from data_validator import clearify_server_data, clearify_pos_data
 import datetime
 from log import setup_logger
 import logging
+from aiolimiter import AsyncLimiter
+from tqdm.asyncio import tqdm_asyncio
 from dotenv import load_dotenv
+
 
 load_dotenv()
 # Настройка логирования
@@ -17,9 +20,11 @@ logger = logging.getLogger("ServiceDeskLogger")
 BASE_API_URL = f"{os.getenv('BASE_URL')}/services/rest/"
 ACCESS_KEY = os.getenv("SDKEY")
 
+limiter = AsyncLimiter(15, 1)
+
 # Асинхронная функция для заполнения базы данных из ServiceDesk
 async def initialize_database():
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=httpx.Timeout(20.0)) as client:
         with SessionLocal() as session:
             logger.info("Инициализация базы данных начата")
             # Пример POST-запроса к ServiceDesk для получения списка компаний
@@ -28,11 +33,20 @@ async def initialize_database():
                 "accessKey": ACCESS_KEY,
                 "attrs": "adress,UUID,title,lastModifiedDate,KEsInUse,additionalName,parent,recipientAgreements"
             }
-            response = await client.post(url, params=payload)
+            try:
+                async with limiter:
+                    response = await client.post(url, params=payload)
+            except httpx.TimeoutException as e:
+                logger.error(f"Таймаут при получении списка компаний: {e}")
+                return
+            except Exception as e:
+                logger.error(f"Произошла ошибка при получении списка компаний: {e}")
+                return
+
             if response.status_code == 200:
                 companies_data = response.json()
                 tasks = []
-                for company_data in companies_data:
+                for company_data in tqdm_asyncio(companies_data, desc="Обработка компаний", unit="компания"):
                     logger.debug(f"Обработка компании UUID: {company_data['UUID']}")
 
                     # Проверка активности контракта
@@ -62,8 +76,16 @@ async def initialize_database():
                         if equipment_data['metaClass'] in ['objectBase$Server', 'objectBase$Workstation', 'objectBase$FR']:
                             tasks.append(process_equipment(client, equipment_data, company, session))
 
+                semaphore = asyncio.Semaphore(20)
+                async def semaphore_wrapper(task):
+                    async with semaphore:
+                        return await task
+                tasks = [semaphore_wrapper(task) for task in tasks]
+
+                for f in tqdm_asyncio.as_completed(tasks, desc="Обработка оборудования", unit="ед."):
+                    await f
                 # Асинхронное выполнение всех задач
-                await asyncio.gather(*tasks)
+                # await asyncio.gather(*tasks)
                 session.commit()
                 logger.info("База данных успешно инициализирована")
 
@@ -74,10 +96,19 @@ async def process_agreement(client, agreement_data):
         "accessKey": ACCESS_KEY,
         "attrs": "state,UUID"
     }
-    response = await client.get(agreement_url, params=agreement_params)
-    logger.debug(f"Проверка статуса контракта: {agreement_data['UUID']}")
+    try:
+        async with limiter:
+            response = await client.get(agreement_url, params=agreement_params)
+    except httpx.TimeoutException as e:
+        logger.error(f"Таймаут при проверке статуса контракта: {agreement_data['UUID']}: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"Ошибка при получении контракта {agreement_data['UUID']}: {e}")
+        return False
     if response.status_code == 200:
+        logger.debug(f"Проверка статуса контракта: {agreement_data['UUID']}")
         agreement_info = response.json()
+        logger.debug(f"Статус контракта: {agreement_info['state']}")
         return agreement_info['state'] == 'active'
     return False
 
@@ -96,8 +127,15 @@ async def process_equipment(client, equipment_data, company, session):
         }
     else:
         return
-
-    response = await client.get(equipment_url, params=equipment_params)
+    try:
+        async with limiter:
+            response = await client.get(equipment_url, params=equipment_params)
+    except httpx.TimeoutException as e:
+        logger.error(f"Таймаут при получении оборудования: {equipment_data['UUID']}: {e}")
+        return
+    except Exception as e:
+        logger.error(f"Произошла ошибка при получении оборудования: {equipment_data['UUID']}: {e}")
+        return
     if response.status_code == 200:
         equipment_info = response.json()
 
@@ -140,9 +178,15 @@ async def validate_servers():
     with SessionLocal() as session:
         servers = session.query(Server).all()
         tasks = []
-        for server in servers:
+        semaphore = asyncio.Semaphore(20)
+        async def semaphore_wrapper(coro):
+            async with semaphore:
+                return await coro
+
+        for server in tqdm_asyncio(servers, desc="Обработка серверов", unit="сервер"):
             logger.debug(f"Запуск валидации сервера UUID: {server.uuid}")
-            tasks.append(validate_server_data(server, session))
+            tasks.append(semaphore_wrapper(validate_server_data(server, session)))
+        
         await asyncio.gather(*tasks)
         session.commit()
     logger.info("Процесс валидации серверов завершен")
@@ -152,9 +196,15 @@ async def validate_workstations():
     with SessionLocal() as session:
         workstations = session.query(Workstation).all()
         tasks = []
-        for workstation in workstations:
+        semaphore = asyncio.Semaphore(20)
+        async def semaphore_wrapper(coro):
+            async with semaphore:
+                return await coro
+
+        for workstation in tqdm_asyncio(workstations, desc="Обработка рабочих станций", unit="pos"):
             logger.debug(f"Запуск валидации рабочей станции UUID: {workstation.uuid}")
-            tasks.append(validate_workstation_data(workstation, session))
+            tasks.append(semaphore_wrapper(validate_workstation_data(workstation, session)))
+
         await asyncio.gather(*tasks)
         session.commit()
     logger.info("Процесс валидации рабочих станций завершен")
@@ -229,7 +279,7 @@ def main():
     asyncio.run(run_all())
 
 async def run_all():
-    # await initialize_database()
+    await initialize_database()
     await validate_servers()
     await validate_workstations()
 

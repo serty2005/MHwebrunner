@@ -17,7 +17,9 @@ class Company(Base):
     last_modified_date = Column(DateTime)
     additional_name = Column(String)
     parent_uuid = Column(String, ForeignKey('companies.uuid'), nullable=True)
-    parent = relationship("Company", remote_side=[uuid])
+    parent = relationship("Company", remote_side=[uuid], backref="children")
+    servers = relationship("Server", back_populates="owner")
+    workstations = relationship("Workstation", back_populates="owner")
 
 # Модель для сервера
 class Server(Base):
@@ -37,7 +39,7 @@ class Server(Base):
     iiko_version = Column(String)
     description = Column(String)
     owner_id = Column(String, ForeignKey('companies.uuid'))
-    owner = relationship("Company")
+    owner = relationship("Company", back_populates="servers")
 
 # Модель для рабочей станции
 class Workstation(Base):
@@ -52,7 +54,7 @@ class Workstation(Base):
     last_modified_date = Column(DateTime)
     uuid = Column(String, unique=True)
     owner_id = Column(String, ForeignKey('companies.uuid'))
-    owner = relationship("Company")
+    owner = relationship("Company", back_populates="workstations")
 
 # Настройка подключения к базе данных
 DATABASE_URL = "sqlite:///./test.db"

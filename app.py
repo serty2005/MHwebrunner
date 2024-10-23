@@ -12,6 +12,15 @@ app = FastAPI()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
+def generate_servicedesk_link(uuid: str) -> str:
+    base_url = os.getenv("BASE_URL")
+    if base_url:
+        servicedesk_link = f"{base_url}/operator/#uuid:{uuid}"
+        return servicedesk_link
+    return "#"
+
+templates.env.globals['generate_servicedesk_link'] = generate_servicedesk_link
+
 # Получение базы данных
 @app.middleware("http")
 async def db_session_middleware(request: Request, call_next):
@@ -31,5 +40,5 @@ def get_db(request: Request):
 @app.get("/", response_class=HTMLResponse)
 async def read_companies(request: Request):
     db: Session = get_db(request)
-    companies = db.query(Company).all()
-    return templates.TemplateResponse("index.html", {"request": request, "companies": companies})
+    top_level_companies = db.query(Company).filter(Company.parent_uuid == None).all()
+    return templates.TemplateResponse("index.html", {"request": request, "top_level_companies": top_level_companies})
