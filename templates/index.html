@@ -7,22 +7,35 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.3/css/bulma.min.css">
     <!-- Ваши стили -->
     <style>
-        /* Стили для колонок компаний */
-        .company-column {
-            flex: 1 1 600px;
-            max-width: 700px;
+        /* Стили для контейнера сетей */
+        .network-companies {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
         }
+        /* Стили для колонок компаний внутри сети */
+        .network-companies .company-column {
+            flex: 1 1 calc(33.333% - 1rem);
+            max-width: calc(33.333% - 1rem);
+        }
+        /* Стили для блоков компаний */
         .company-box {
             width: 100%;
         }
         /* Стили для блоков подключений */
         .connection-box {
-            max-width: 300px;
+            width: 100%;
             margin: 0 auto;
         }
-        /* Медиа-запрос для экранов меньшей ширины */
+        /* Медиа-запросы для адаптивности */
+        @media screen and (max-width: 1024px) {
+            .network-companies .company-column {
+                flex: 1 1 calc(50% - 1rem);
+                max-width: calc(50% - 1rem);
+            }
+        }
         @media screen and (max-width: 768px) {
-            .company-column {
+            .network-companies .company-column {
                 flex: 1 1 100%;
                 max-width: 100%;
             }
@@ -39,7 +52,7 @@
 
         <!-- Переключатель показа компаний без активного контракта -->
         <div class="field">
-            <input id="toggleInactive" type="checkbox" class="switch is-rounded is-info" checked>
+            <input id="toggleInactive" type="checkbox" class="switch is-rounded is-info">
             <label for="toggleInactive">Показывать компании без активного контракта</label>
         </div>
 
@@ -104,9 +117,9 @@
                         {% endfor %}
 
                         <!-- Компании внутри сети -->
-                        <div class="columns is-multiline is-centered">
+                        <div class="network-companies">
                         {% for child_company in company.children %}
-                            <div class="column company-column child-company"
+                            <div class="company-column child-company"
                                  data-company-name="{{ child_company.title | lower }}"
                                  data-company-address="{{ child_company.address | default('') | lower }}"
                                  data-company-additional="{{ child_company.additional_name | default('') | lower }}"
