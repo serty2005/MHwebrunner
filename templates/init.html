@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Инициализация базы данных</title>
+    <!-- Подключаем Bulma CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.3/css/bulma.min.css">
+    <!-- Подключаем jQuery (для удобства) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+<section class="section">
+    <div class="container">
+        <h1 class="title">Инициализация базы данных</h1>
+        <button id="startButton" class="button is-primary">Запустить инициализацию</button>
+        <div id="progress" class="content" style="margin-top: 20px;">
+            <pre id="progressOutput"></pre>
+        </div>
+    </div>
+</section>
+
+<script type="text/javascript">
+    $(document).ready(function(){
+        var websocket = new WebSocket("ws://" + location.host + "/ws");
+
+        websocket.onopen = function(event) {
+            console.log("WebSocket соединение установлено.");
+        };
+
+        websocket.onmessage = function(event) {
+            $('#progressOutput').append(event.data);
+            // Прокручиваем вниз
+            $('#progressOutput').scrollTop($('#progressOutput')[0].scrollHeight);
+        };
+
+        websocket.onclose = function(event) {
+            console.log("WebSocket соединение закрыто.");
+        };
+
+        $('#startButton').on('click', function(){
+            websocket.send("start_init");
+            $(this).prop('disabled', true);
+        });
+    });
+</script>
+</body>
+</html>

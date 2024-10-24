@@ -8,10 +8,10 @@ from log import setup_logger
 import logging
 from aiolimiter import AsyncLimiter
 from tqdm.asyncio import tqdm_asyncio
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 
 
-load_dotenv()
+# load_dotenv()
 # Настройка логирования
 setup_logger(console_logging=False)
 logger = logging.getLogger("ServiceDeskLogger")
