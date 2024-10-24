@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+    environment:
+      BASE_URL: "${BASE_URL}"
+      SDKEY: "${SDKEY}"
+    ports:
+      - "8000:8000"
+    image: mhwebrunner:latest
+    restart: unless-stopped
