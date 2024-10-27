@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from models import Company, Server, Workstation, SessionLocal
 from starlette.responses import HTMLResponse
@@ -11,6 +12,9 @@ app = FastAPI()
 # Инициализация шаблонизатора Jinja2
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
 
 def generate_servicedesk_link(uuid: str) -> str:
     base_url = os.getenv("BASE_URL")

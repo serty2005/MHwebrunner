@@ -20,7 +20,7 @@ logger = logging.getLogger("ServiceDeskLogger")
 BASE_API_URL = f"{os.getenv('BASE_URL')}/services/rest/"
 ACCESS_KEY = os.getenv("SDKEY")
 
-limiter = AsyncLimiter(15, 1)
+limiter = AsyncLimiter(45, 1)
 
 # Асинхронная функция для заполнения базы данных из ServiceDesk
 async def initialize_database():
@@ -152,9 +152,9 @@ async def process_equipment(client, equipment_data, company, session):
                 iiko_version=equipment_info.get('iikoVersion', None),
                 last_modified_date=datetime.datetime.strptime(equipment_info['lastModifiedDate'], "%Y.%m.%d %H:%M:%S"),
                 description='{} {}'.format(
-                    equipment_info.get('nameforclient', None),
-                    equipment_info.get('RDP', None),
-                    equipment_info.get('description', None)
+                    equipment_info.get('nameforclient', ''),
+                    equipment_info.get('RDP', ''),
+                    equipment_info.get('description', '')
                 ),
                 owner=company
             )
@@ -166,7 +166,7 @@ async def process_equipment(client, equipment_data, company, session):
                 device_name=equipment_info['DeviceName'],
                 teamviewer=equipment_info.get('Teamviewer', None),
                 anydesk=equipment_info.get('AnyDesk', None),
-                commentary=equipment_info.get('Commentariy', None),
+                commentary=equipment_info.get('Commentariy', ''),
                 last_modified_date=datetime.datetime.strptime(equipment_info['lastModifiedDate'], "%Y.%m.%d %H:%M:%S"),
                 owner=company
             )
@@ -219,7 +219,7 @@ async def validate_server_data(server, session):
             'AnyDesk': server.anydesk,
             'IP': server.ip,
             'CabinetLink': server.cabinet_link,
-            'litemanager_raw': server.description,
+            'raw': server.description,
             'litemanager': server.litemanager,
         }
 
@@ -253,7 +253,7 @@ async def validate_workstation_data(workstation, session):
             'Teamviewer': workstation.teamviewer,
             'UUID': workstation.uuid,
             'AnyDesk': workstation.anydesk,
-            'litemanager_raw': workstation.commentary,
+            'raw': workstation.commentary,
             'litemanager': workstation.litemanager,
             'UUID': workstation.uuid,
         }
@@ -273,7 +273,7 @@ async def validate_workstation_data(workstation, session):
         session.add(workstation)
 
     except Exception as e:
-        logger.error(f"Валидация рабочей станции UUID: {workstation.uuid} завершена с ошибкой: {e}")
+        logger.error(f"Валидация рабочей станции UUID: {workstation.uuid} завершена с ошибкой: {e} {data}")
 
 def main():
     asyncio.run(run_all())

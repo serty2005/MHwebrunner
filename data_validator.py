@@ -35,16 +35,18 @@ def validate_remote_access_id(access_id_raw: str) -> str:
     match_id = None
     if access_id_raw:
         match_id = re.search(REMOTE_ACCESS_ID_PATTERN, access_id_raw)
-    if match_id:
-        access_id = match_id.group(0)
-        return access_id
+        if match_id:
+            access_id = match_id.group(0)
+            return access_id.replace(' ', '')
     else:
         logging.error(f"Invalid remote ID: {access_id_raw}")
         access_id = None
-    return access_id
+        return access_id
 
 
 def validate_ip_address(ip_address: str) -> str:
+    if not ip_address:
+        return None
     if ip_address and ('.iiko.it' in ip_address or '.syrve.online' in ip_address):
         # Обработка облачных серверов
         if '.iiko.it' in ip_address:
@@ -103,7 +105,7 @@ async def clearify_server_data(server_data: dict) -> dict:
             server_data[field] = validate_remote_access_id(server_data[field])
 
     # Извлечение LiteManager ID
-    lm_match = re.search(r'MH_\d{5}', server_data.get('litemanager_raw', ''))
+    lm_match = re.search(r'MH_\d{5}', server_data.get('raw', ''))
     server_data['litemanager'] = lm_match[0] if lm_match else ''
 
     logger.info(f"Валидация данных сервера UUID {server_data.get('UUID')} завершена")
@@ -117,8 +119,8 @@ async def clearify_pos_data(pos_data: dict) -> dict:
         if pos_data.get(field):
             pos_data[field] = validate_remote_access_id(pos_data[field])
     
-    lm_match = re.findall(r'MH_\d{5}', pos_data.get('litemanager_raw', ''))
-    pos_data['litemanager'] = lm_match[0] if lm_match else ''
+    lm_match = re.findall(r'MH_\d{5}', pos_data.get('raw', '')) if pos_data.get('raw') else None 
+    pos_data['litemanager'] = lm_match[0] if lm_match else None
 
     logger.info(f"Валидация данных POS UUID {pos_data.get('UUID')} завершена")
     return pos_data

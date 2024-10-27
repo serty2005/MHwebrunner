@@ -31,7 +31,7 @@ def setup_logger(console_logging=True):
 
         # Создаем обработчик для записи лога в файл
         file_handler = logging.FileHandler(log_filepath, encoding='utf-8')
-        file_handler.setLevel(logging.INFO)
+        file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
 

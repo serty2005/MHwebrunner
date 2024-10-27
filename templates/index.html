@@ -1,32 +1,96 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
     <meta charset="UTF-8">
     <title>Компании и Сети</title>
+    <link rel="icon" type="image/x-icon" href="static/favicon.ico">
     <!-- Подключаем Bulma CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.3/css/bulma.min.css">
     <!-- Ваши стили -->
     <style>
-        /* Стили для колонок компаний */
-        .company-column {
-            flex: 1 1 600px;
-            max-width: 700px;
+       /* Снимаем ограничение размера для внешнего контейнера */
+       .container {
+        width: 100%; 
+        max-width: none !important; 
+        padding: 0 20px; 
+        
+    }
+
+    /* Сетка для сетей и компаний */
+    .grid-container {
+        display: grid;
+        gap: 20px; /* Расстояние между элементами */
+    }
+
+    /* Медиа-запросы для разного количества колонок */
+    @media (min-width: 2000px) {
+        .grid-container {
+            grid-template-columns: repeat(4, 1fr);
         }
-        .company-box {
-            width: 100%;
+    }
+
+    @media (min-width: 1450px) and (max-width: 1999px) {
+        .grid-container {
+            grid-template-columns: repeat(3, 1fr);
         }
-        /* Стили для блоков подключений */
-        .connection-box {
-            max-width: 300px;
-            margin: 0 auto;
+    }
+
+    @media (min-width: 900px) and (max-width: 1449px) {
+        .grid-container {
+            grid-template-columns: repeat(2, 1fr);
         }
-        /* Медиа-запрос для экранов меньшей ширины */
-        @media screen and (max-width: 768px) {
-            .company-column {
-                flex: 1 1 100%;
-                max-width: 100%;
-            }
+    }
+
+    @media (max-width: 899px) {
+        .grid-container {
+            grid-template-columns: 1fr;
         }
+    }
+
+    /* Растягиваем все внутренние блоки по высоте */
+    .box {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    /* Общий стиль для колонок */
+    .columns.is-multiline {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: stretch; /* Выравнивание по высоте */
+    }
+
+    /* Для выравнивания контейнеров по высоте */
+    .column {
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Растягивание содержимого на всю высоту */
+    .box {
+        flex: 1;
+    }
+
+    /* Для дочерних компаний */
+    .child-company {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+    }
+
+    /* Чтобы серверы и рабочие станции растягивались */
+    .connection-box {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    /* Дополнительная настройка для кнопок */
+    .connection-box .columns {
+        margin-top: auto;
+    }
         /* Скрытие элементов */
         .is-hidden {
             display: none !important;
@@ -59,7 +123,7 @@
                  data-company-address="{{ company.address | default('') | lower }}"
                  data-company-additional="{{ company.additional_name | default('') | lower }}"
                  data-active-contract="{{ company.active_contract }}">
-                <div class="box company-box {% if company.active_contract == 0 %}has-background-grey-lighter inactive-company{% endif %}">
+                <div class="box company-box grid-container {% if company.active_contract == 0 %}has-background-grey-lighter inactive-company{% endif %}">
                     <h2 class="title has-text-centered">{{ company.title }}</h2>
 
                     <!-- Добавляем адрес компании, если он есть -->
@@ -104,14 +168,14 @@
                         {% endfor %}
 
                         <!-- Компании внутри сети -->
-                        <div class="columns is-multiline is-centered">
+                        <div class="columns is-multiline is-centered grid-container">
                         {% for child_company in company.children %}
                             <div class="column company-column child-company"
                                  data-company-name="{{ child_company.title | lower }}"
                                  data-company-address="{{ child_company.address | default('') | lower }}"
                                  data-company-additional="{{ child_company.additional_name | default('') | lower }}"
                                  data-active-contract="{{ child_company.active_contract }}">
-                                <div class="box {% if child_company.active_contract == 0 %}has-background-grey-lighter inactive-company{% endif %}">
+                                <div class="box company-box {% if child_company.active_contract == 0 %}has-background-grey-lighter inactive-company{% endif %}">
                                     <h3 class="subtitle has-text-centered">{{ child_company.title }}</h3>
 
                                     <!-- Добавляем адрес дочерней компании, если он есть -->
@@ -296,7 +360,7 @@
     function connectIiko(ipId) {
         var passwordField = document.getElementById("password-iiko-" + ipId);
         var password = passwordField.value;
-        var url = "clearbat://iiko@" + ipId + ":443@MH:" + password;
+        var url = "clearbat://iiko@" + ipId + "@MH:" + password;
         window.location.href = url;
         passwordField.value = ""; // Очистка поля ввода
     }
