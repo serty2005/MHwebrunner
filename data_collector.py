@@ -275,6 +275,7 @@ async def validate_workstation_data(workstation, session):
     except Exception as e:
         logger.error(f"Валидация рабочей станции UUID: {workstation.uuid} завершена с ошибкой: {e} {data}")
 
+  
 def main():
     asyncio.run(run_all())
 
