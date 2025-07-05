@@ -1,5 +1,6 @@
 from sqlalchemy import create_engine, Column, String, DateTime, Boolean, ForeignKey
 from sqlalchemy.orm import sessionmaker, relationship, declarative_base
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 import uuid
 
 # Создаем базовый класс для модели данных
@@ -57,14 +58,18 @@ class Workstation(Base):
     owner = relationship("Company", back_populates="workstations")
 
 # Настройка подключения к базе данных
-DATABASE_URL = "sqlite:///./test.db"
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-Base.metadata.create_all(bind=engine)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+#DATABASE_URL = "sqlite:///./test.db"
+#engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+#Base.metadata.create_all(bind=engine)
+#SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+DATABASE_URL = "sqlite+aiosqlite:///./test.db"
+engine = create_async_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 # Пример использования сессии для добавления данных
 if __name__ == "__main__":
-    session = SessionLocal()
+    session = AsyncSessionLocal()
     new_company = Company()
     session.add(new_company)
     session.commit()

@@ -1,10 +1,11 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from models import Company, Server, Workstation, SessionLocal
 from starlette.responses import HTMLResponse
 import os
+from services import ServiceDeskService
 
 # Инициализация FastAPI приложения
 app = FastAPI()
@@ -13,8 +14,6 @@ app = FastAPI()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
-
 
 def generate_servicedesk_link(uuid: str) -> str:
     base_url = os.getenv("BASE_URL")
@@ -46,3 +45,11 @@ async def read_companies(request: Request):
     db: Session = get_db(request)
     top_level_companies = db.query(Company).filter(Company.parent_uuid == None).all()
     return templates.TemplateResponse("index.html", {"request": request, "top_level_companies": top_level_companies})
+
+# Эндпоинт для синхронизации данных
+@app.post("/sync")
+async def sync_data(request: Request, background_tasks: BackgroundTasks):
+    db: Session = get_db(request)
+    service = ServiceDeskService(db)
+    background_tasks.add_task(service.sync_all_data)
+    return {"message": "Синхронизация данных запущена"}
