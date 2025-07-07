@@ -1,8 +1,6 @@
-# --- START OF FILE data_validator.py ---
-
 import re
 import logging
-import datetime # Импортируем datetime для работы с датами
+import datetime
 from typing import Optional, Dict, Any
 
 # Получаем логгер, настроенный в другом месте (например, sync_runner.py или log.py)

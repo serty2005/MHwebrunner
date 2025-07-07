@@ -1,5 +1,3 @@
-# --- START OF FILE schemas.py ---
-
 from pydantic import BaseModel
 from typing import List, Optional
 import datetime
@@ -70,5 +68,3 @@ class SearchResultResponse(BaseModel):
     servers: List[ServerSearchResult]
     workstations: List[WorkstationSearchResult]
     fiscal_registers: List[FiscalRegisterSearchResult]
-
-# --- END OF FILE schemas.py ---

@@ -1,16 +1,11 @@
 import asyncio
 import logging
 import datetime
-import sys # Импортируем sys для os.exit
-# Импортируем AsyncSessionLocal, Base, engine, check_db_connection
+import sys
 from models import AsyncSessionLocal, Base, engine, check_db_connection
-# Импортируем ServiceDeskService
 from services import ServiceDeskService
-import os
 from dotenv import load_dotenv
-# import random # Больше не используется в текущей тестовой логике
-# import httpx # Больше не используется в текущей тестовой логике
-# Импортируем функцию настройки логгирования
+
 from log import setup_logger
 
 # Загрузка переменных окружения из .env файла
