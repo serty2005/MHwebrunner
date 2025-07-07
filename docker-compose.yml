@@ -1,54 +1,51 @@
+# --- START OF FILE docker-compose.yml ---
+
+version: '3.8'
 
 services:
   # Сервис базы данных PostgreSQL
   db:
-    image: postgres:15-alpine # Используем официальный образ PostgreSQL (alpine для меньшего размера)
-    restart: unless-stopped # Автоматический перезапуск, если контейнер останавливается (кроме явной остановки)
+    image: postgres:15-alpine
+    restart: unless-stopped
     environment:
-      # Переменные окружения для настройки PostgreSQL
-      # Значения будут взяты из файла .env
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-      # PGDATA: /var/lib/postgresql/data/pgdata # Опционально: изменить путь к данным внутри контейнера
+      # Переменные окружения для настройки PostgreSQL - задаем значения напрямую
+      # *** ИЗМЕНЕНИЕ ЗДЕСЬ ***
+      POSTGRES_USER: test_user # Замените на ваше значение
+      POSTGRES_PASSWORD: your_secure_password # Замените на ваше значение
+      POSTGRES_DB: servicedesk_db # Замените на ваше значение
+      # *** КОНЕЦ ИЗМЕНЕНИЯ ***
     volumes:
-      # Монтируем именованный том для сохранения данных БД
-      - db_data:/var/lib/postgresql/data # Стандартный путь для данных PostgreSQL
+      - db_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      # Проверка готовности БД перед запуском зависимых сервисов
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 5s # Интервал проверки
-      timeout: 5s # Таймаут проверки
-      retries: 5 # Количество попыток
-      start_period: 10s # Период ожидания перед первой проверкой
+      test: ["CMD-SHELL", "pg_isready -U test_user -d servicedesk_db"] # Обновите пользователя и БД здесь
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # Сервис приложения FastAPI
   app:
-    build: .
+    build:
+      context: https://github.com/your_username/your_repository.git#your_branch_name # Замените на ваш username, repository и branch_name
+      dockerfile: Dockerfile
     restart: unless-stopped
-    # Переменные окружения для приложения, берутся из файла .env
-    # DATABASE_URL уже содержит имя сервиса БД 'db'
     environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - BASE_URL=${BASE_URL}
-      - SDKEY=${SDKEY}
-
+      # Переменные окружения для приложения - задаем значения напрямую
+      # URL базы данных, используя имя сервиса БД 'db'
+      DATABASE_URL: postgresql+asyncpg://test_user:your_secure_password@db:5432/servicedesk_db # Обновите пользователя, пароль и БД здесь
+      # Переменные для ServiceDesk API
+      BASE_URL: http://your-servicedesk-instance.com # Замените на ваш URL
+      SDKEY: your_servicedesk_access_key
     ports:
-      # Маппинг порта приложения на хост
-      - "5005:8000"
+      - "8000:8000"
     depends_on:
-      # Запускаем этот сервис только после того, как сервис 'db' готов (healthcheck successful)
       db:
         condition: service_healthy
     volumes:
-      # Монтируем директорию логов, чтобы их можно было видеть на хосте
-      - ./logs:/opt/MHwebrunner/logs
-      # Опционально: монтирование кода в режиме разработки для горячей перезагрузки (не для production)
-      # - .:/app
+      - ./logs:/app/logs
 
 
 volumes:
-  # Определение именованного тома для данных БД
   db_data:

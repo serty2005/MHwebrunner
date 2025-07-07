@@ -9,7 +9,7 @@ RUN mkdir -p /opt/MHwebrunner
 
 WORKDIR /opt/MHwebrunner
 
-RUN mkdir -p logs
+RUN mkdir -p /opt/MHwebrunner/logs
 
 COPY requirements.txt .
 
