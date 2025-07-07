@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 # Импортируем AsyncSession для тайп-хинтинга в middleware и эндпоинтах
 from sqlalchemy.ext.asyncio import AsyncSession
 # Импортируем все модели и фабрику асинхронных сессий
-from models import Company, Server, Workstation, FiscalRegister, AsyncSessionLocal, check_db_connection
+from models import Base, engine, AsyncSessionLocal, check_db_connection
 from starlette.responses import HTMLResponse
 import os
 from services import ServiceDeskService
@@ -44,18 +44,21 @@ async def lifespan(app: FastAPI):
     # Проверяем подключение к базе данных с повторными попытками
     try:
         # Увеличил количество попыток и задержку для надежности
-        await check_db_connection(retries=20, delay=5)
+        await check_db_connection(retries=2, delay=3)
         logger.info("Lifespan startup завершен. База данных доступна.")
     except Exception as e:
         logger.critical(f"Критическая ошибка при подключении к БД во время startup: {e}", exc_info=True)
         raise # Пробрасываем исключение, чтобы Uvicorn его увидел
-
-    # TODO: Здесь можно добавить инициализацию таблиц, если они еще не созданы sync_runner'ом
-    # from models import Base, engine
-    # async with engine.begin() as conn:
-    #      await conn.run_sync(Base.metadata.create_all)
-    # logger.info("Проверка и создание таблиц БД завершены в lifespan.")
-
+    
+    try:
+        async with engine.begin() as conn:
+             # run_sync позволяет выполнять синхронные операции с асинхронным движком
+             await conn.run_sync(Base.metadata.create_all)
+        logger.info("Проверка и создание таблиц БД завершены в lifespan.")
+    except Exception as e:
+        logger.critical(f"Критическая ошибка при инициализации или создании таблиц БД в lifespan: {e}", exc_info=True)
+        # Генерируем исключение, чтобы Uvicorn не запускал приложение
+        raise
 
     # --- После yield приложение начинает принимать запросы ---
     yield

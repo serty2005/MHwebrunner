@@ -1,0 +1,54 @@
+
+services:
+  # Сервис базы данных PostgreSQL
+  db:
+    image: postgres:15-alpine # Используем официальный образ PostgreSQL (alpine для меньшего размера)
+    restart: unless-stopped # Автоматический перезапуск, если контейнер останавливается (кроме явной остановки)
+    environment:
+      # Переменные окружения для настройки PostgreSQL
+      # Значения будут взяты из файла .env
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      # PGDATA: /var/lib/postgresql/data/pgdata # Опционально: изменить путь к данным внутри контейнера
+    volumes:
+      # Монтируем именованный том для сохранения данных БД
+      - db_data:/var/lib/postgresql/data # Стандартный путь для данных PostgreSQL
+    ports:
+      - "5432:5432"
+    healthcheck:
+      # Проверка готовности БД перед запуском зависимых сервисов
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s # Интервал проверки
+      timeout: 5s # Таймаут проверки
+      retries: 5 # Количество попыток
+      start_period: 10s # Период ожидания перед первой проверкой
+
+  # Сервис приложения FastAPI
+  app:
+    build: .
+    restart: unless-stopped
+    # Переменные окружения для приложения, берутся из файла .env
+    # DATABASE_URL уже содержит имя сервиса БД 'db'
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - BASE_URL=${BASE_URL}
+      - SDKEY=${SDKEY}
+
+    ports:
+      # Маппинг порта приложения на хост
+      - "5005:8000"
+    depends_on:
+      # Запускаем этот сервис только после того, как сервис 'db' готов (healthcheck successful)
+      db:
+        condition: service_healthy
+    volumes:
+      # Монтируем директорию логов, чтобы их можно было видеть на хосте
+      - ./logs:/opt/MHwebrunner/logs
+      # Опционально: монтирование кода в режиме разработки для горячей перезагрузки (не для production)
+      # - .:/app
+
+
+volumes:
+  # Определение именованного тома для данных БД
+  db_data:
