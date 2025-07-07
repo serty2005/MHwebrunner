@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Компании и Сети</title>
+    <link rel="icon" type="image/x-icon" href="static/favicon.ico">
+    <!-- Подключаем Bulma CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.3/css/bulma.min.css">
+    <!-- Ваши стили -->
+    <style>
+       /* Снимаем ограничение размера для внешнего контейнера */
+       .container {
+        width: 100%; 
+        max-width: none !important; 
+        padding: 0 20px; 
+        
+    }
+
+    /* Сетка для сетей и компаний */
+    .grid-container {
+        display: grid;
+        gap: 20px; /* Расстояние между элементами */
+    }
+
+    /* Медиа-запросы для разного количества колонок */
+    @media (min-width: 2000px) {
+        .grid-container {
+            grid-template-columns: repeat(4, 1fr);
+        }
+    }
+
+    @media (min-width: 1450px) and (max-width: 1999px) {
+        .grid-container {
+            grid-template-columns: repeat(3, 1fr);
+        }
+    }
+
+    @media (min-width: 900px) and (max-width: 1449px) {
+        .grid-container {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @media (max-width: 899px) {
+        .grid-container {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* Растягиваем все внутренние блоки по высоте */
+    .box {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    /* Общий стиль для колонок */
+    .columns.is-multiline {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: stretch; /* Выравнивание по высоте */
+    }
+
+    /* Для выравнивания контейнеров по высоте */
+    .column {
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Растягивание содержимого на всю высоту */
+    .box {
+        flex: 1;
+    }
+
+    /* Для дочерних компаний */
+    .child-company {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+    }
+
+    /* Чтобы серверы и рабочие станции растягивались */
+    .connection-box {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    /* Дополнительная настройка для кнопок */
+    .connection-box .columns {
+        margin-top: auto;
+    }
+        /* Скрытие элементов */
+        .is-hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+<section class="section">
+    <div class="container">
+
+        <!-- Переключатель показа компаний без активного контракта -->
+        <div class="field">
+            <input id="toggleInactive" type="checkbox" class="switch is-rounded is-info">
+            <label for="toggleInactive">Показывать компании без активного контракта</label>
+        </div>
+
+        <!-- Строка поиска -->
+        <div class="field">
+            <div class="control">
+                <input id="searchInput" class="input" type="text" placeholder="Поиск...">
+            </div>
+        </div>
+
+        <h1 class="title">Компании и Сети</h1>
+        <div class="columns is-multiline">
+            <!-- Перебираем все верхнеуровневые компании -->
+            {% for company in top_level_companies %}
+            <div class="column is-full top-level-company"
+                 data-company-name="{{ company.title | lower }}"
+                 data-company-address="{{ company.address | default('') | lower }}"
+                 data-company-additional="{{ company.additional_name | default('') | lower }}"
+                 data-active-contract="{{ company.active_contract }}">
+                <div class="box company-box grid-container {% if company.active_contract == 0 %}has-background-grey-lighter inactive-company{% endif %}">
+                    <h2 class="title has-text-centered">{{ company.title }}</h2>
+
+                    <!-- Добавляем адрес компании, если он есть -->
+                    {% if company.address %}
+                    <p class="has-text-centered">{{ company.address }}</p>
+                    {% endif %}
+
+                    {% if company.additional_name %}
+                    <h3 class="subtitle has-text-centered">{{ company.additional_name }}</h3>
+                    {% endif %}
+
+                    <!-- Проверяем, есть ли у компании дочерние компании -->
+                    {% if company.children %}
+                        <!-- Это сеть -->
+                        <!-- Серверы сети -->
+                        {% for server in company.servers %}
+                        <div class="box connection-box">
+                            <p class="has-text-centered"><strong>{{ server.device_name }}</strong></p>
+                            <p class="has-text-centered"><strong>Адрес сервера: {{ server.ip }}</strong></p>
+                            <div class="columns is-centered">
+                                <div class="column is-narrow">
+                                    <a class="button is-link {% if company.active_contract == 0 %}is-disabled{% endif %}"
+                                       href="{{ server.cabinet_link }}">Partners</a>
+                                </div>
+                                <div class="column is-narrow">
+                                    <a class="button is-link {% if company.active_contract == 0 %}is-disabled{% endif %}"
+                                       href="{{ generate_servicedesk_link(server.uuid) }}">Ссылка в SD</a>
+                                </div>
+                            </div>
+                            <div class="field has-addons is-centered">
+                                <div class="control is-expanded">
+                                    <input id="password-iiko-{{ server.ip }}" class="input" type="password"
+                                           placeholder="Пароль" {% if company.active_contract == 0 %}disabled{% endif %}>
+                                </div>
+                                <div class="control">
+                                    <button class="button is-primary"
+                                            onclick="connectIiko('{{ server.ip }}')"
+                                            {% if company.active_contract == 0 %}disabled{% endif %}>RunOffice</button>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+
+                        <!-- Компании внутри сети -->
+                        <div class="columns is-multiline is-centered grid-container">
+                        {% for child_company in company.children %}
+                            <div class="column company-column child-company"
+                                 data-company-name="{{ child_company.title | lower }}"
+                                 data-company-address="{{ child_company.address | default('') | lower }}"
+                                 data-company-additional="{{ child_company.additional_name | default('') | lower }}"
+                                 data-active-contract="{{ child_company.active_contract }}">
+                                <div class="box company-box {% if child_company.active_contract == 0 %}has-background-grey-lighter inactive-company{% endif %}">
+                                    <h3 class="subtitle has-text-centered">{{ child_company.title }}</h3>
+
+                                    <!-- Добавляем адрес дочерней компании, если он есть -->
+                                    {% if child_company.address %}
+                                    <p class="has-text-centered">{{ child_company.address }}</p>
+                                    {% endif %}
+
+                                    <!-- Серверы дочерней компании -->
+                                    {% for server in child_company.servers %}
+                                    <div class="box connection-box">
+                                        <p class="has-text-centered"><strong>{{ server.device_name }}</strong></p>
+                                        <p class="has-text-centered"><strong>Адрес сервера: {{ server.ip }}</strong></p>
+                                        <div class="columns is-centered">
+                                            <div class="column is-narrow">
+                                                <a class="button is-link {% if child_company.active_contract == 0 %}is-disabled{% endif %}"
+                                                   href="{{ server.cabinet_link }}">Partners</a>
+                                            </div>
+                                            <div class="column is-narrow">
+                                                <a class="button is-link {% if child_company.active_contract == 0 %}is-disabled{% endif %}"
+                                                   href="{{ generate_servicedesk_link(server.uuid) }}">Ссылка в SD</a>
+                                            </div>
+                                        </div>
+                                        <div class="field has-addons is-centered">
+                                            <div class="control is-expanded">
+                                                <input id="password-iiko-{{ server.ip }}" class="input" type="password"
+                                                       placeholder="Пароль" {% if child_company.active_contract == 0 %}disabled{% endif %}>
+                                            </div>
+                                            <div class="control">
+                                                <button class="button is-primary"
+                                                        onclick="connectIiko('{{ server.ip }}')"
+                                                        {% if child_company.active_contract == 0 %}disabled{% endif %}>RunOffice</button>
+                                            </div>
+                                        </div>
+                                        {%if server.teamviewer%} 
+                                        <div class="field has-addons is-centered">
+                                            <div class="control is-expanded">
+                                                <input id="password-teamviewer-{{ server.teamviewer }}" class="input" type="password"
+                                                       placeholder="Пароль" {% if child_company.active_contract == 0 %}disabled{% endif %}>
+                                            </div>
+                                            <div class="control">
+                                                <button class="button is-primary"
+                                                        onclick="connectTeamviewer('{{ server.teamviewer }}')"
+                                                        {% if child_company.active_contract == 0 %}disabled{% endif %}>Teamviewer</button>
+                                            </div>
+                                        {%endif%}
+                                        {%if server.anydesk%}
+                                        <div class="field has-addons is-centered">
+                                            <div class="control is-expanded">
+                                                <input id="password-anydesk-{{ server.anydesk }}" class="input" type="password"
+                                                       placeholder="Пароль" {% if child_company.active_contract == 0 %}disabled{% endif %}>
+                                            </div>
+                                            <div class="control">
+                                                <button class="button is-primary"
+                                                        onclick="connectAnydesk('{{ server.anydesk }}')"
+                                                        {% if child_company.active_contract == 0 %}disabled{% endif %}>Anydesk</button>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        {%if server.litemanager%}
+                                        <div class="field has-addons is-centered">
+                                            <div class="control is-expanded">
+                                                <input id="password-litemanager-{{ server.litemanager }}" class="input" type="password"
+                                                       placeholder="Пароль" {% if child_company.active_contract == 0 %}disabled{% endif %}>
+                                            </div>
+                                            <div class="control">
+                                                <button class="button is-primary"
+                                                        onclick="connectIiko('{{ server.litemanager }}')"
+                                                        {% if child_company.active_contract == 0 %}disabled{% endif %}>RunOffice</button>
+                                            </div>
+                                        </div>
+                                        {%endif%}
+                                    </div>
+                                    {% endfor %}
+
+                                    <!-- Рабочие станции дочерней компании -->
+                                    {% for workstation in child_company.workstations %}
+                                    <div class="box connection-box">
+                                        <p class="has-text-centered"><strong>{{ workstation.device_name }}</strong></p>
+
+                                        <!-- Опции подключения -->
+                                        {% if workstation.teamviewer %}
+                                        <div class="field has-addons is-centered">
+                                            <div class="control is-expanded">
+                                                <input id="password-teamviewer-{{ workstation.teamviewer }}" class="input" type="password"
+                                                       placeholder="Пароль" {% if child_company.active_contract == 0 %}disabled{% endif %}>
+                                            </div>
+                                            <div class="control">
+                                                <button class="button is-primary"
+                                                        onclick="connectTeamviewer('{{ workstation.teamviewer }}')"
+                                                        {% if child_company.active_contract == 0 %}disabled{% endif %}>Teamviewer</button>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+
+                                        {% if workstation.anydesk %}
+                                        <div class="field has-addons is-centered">
+                                            <div class="control is-expanded">
+                                                <input id="password-anydesk-{{ workstation.anydesk }}" class="input" type="password"
+                                                       placeholder="Пароль" {% if child_company.active_contract == 0 %}disabled{% endif %}>
+                                            </div>
+                                            <div class="control">
+                                                <button class="button is-primary"
+                                                        onclick="connectAnydesk('{{ workstation.anydesk }}')"
+                                                        {% if child_company.active_contract == 0 %}disabled{% endif %}>Anydesk</button>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+
+                                        {% if workstation.litemanager %}
+                                        <div class="field has-addons is-centered">
+                                            <div class="control is-expanded">
+                                                <input id="password-litemanager-{{ workstation.litemanager }}" class="input" type="password"
+                                                       placeholder="Пароль" {% if child_company.active_contract == 0 %}disabled{% endif %}>
+                                            </div>
+                                            <div class="control">
+                                                <button class="button is-primary"
+                                                        onclick="connectLitemanager('{{ workstation.litemanager }}')"
+                                                        {% if child_company.active_contract == 0 %}disabled{% endif %}>Litemanager</button>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                        </div>
+                    {% else %}
+                        <!-- Это обычная компания -->
+
+                        <!-- Серверы компании -->
+                        {% for server in company.servers %}
+                        <div class="box connection-box">
+                            <p class="has-text-centered"><strong>{{ server.device_name }}</strong></p>
+                            <p class="has-text-centered"><strong>Адрес сервера: {{ server.ip }}</strong></p>
+                            <div class="columns is-centered">
+                                <div class="column is-narrow">
+                                    <a class="button is-link {% if company.active_contract == 0 %}is-disabled{% endif %}"
+                                       href="{{ server.cabinet_link }}">Partners</a>
+                                </div>
+                                <div class="column is-narrow">
+                                    <a class="button is-link {% if company.active_contract == 0 %}is-disabled{% endif %}"
+                                       href="{{ generate_servicedesk_link(server.uuid) }}">Ссылка в SD</a>
+                                </div>
+                            </div>
+                            <div class="field has-addons is-centered">
+                                <div class="control is-expanded">
+                                    <input id="password-iiko-{{ server.ip }}" class="input" type="password"
+                                           placeholder="Пароль" {% if company.active_contract == 0 %}disabled{% endif %}>
+                                </div>
+                                <div class="control">
+                                    <button class="button is-primary"
+                                            onclick="connectIiko('{{ server.ip }}')"
+                                            {% if company.active_contract == 0 %}disabled{% endif %}>RunOffice</button>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+
+                        <!-- Рабочие станции компании -->
+                        {% for workstation in company.workstations %}
+                        <div class="box connection-box">
+                            <p class="has-text-centered"><strong>{{ workstation.device_name }}</strong></p>
+
+                            <!-- Опции подключения -->
+                            {% if workstation.teamviewer %}
+                            <div class="field has-addons is-centered">
+                                <div class="control is-expanded">
+                                    <input id="password-teamviewer-{{ workstation.teamviewer }}" class="input" type="password"
+                                           placeholder="Пароль" {% if company.active_contract == 0 %}disabled{% endif %}>
+                                </div>
+                                <div class="control">
+                                    <button class="button is-primary"
+                                            onclick="connectTeamviewer('{{ workstation.teamviewer }}')"
+                                            {% if company.active_contract == 0 %}disabled{% endif %}>Teamviewer</button>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            {% if workstation.anydesk %}
+                            <div class="field has-addons is-centered">
+                                <div class="control is-expanded">
+                                    <input id="password-anydesk-{{ workstation.anydesk }}" class="input" type="password"
+                                           placeholder="Пароль" {% if company.active_contract == 0 %}disabled{% endif %}>
+                                </div>
+                                <div class="control">
+                                    <button class="button is-primary"
+                                            onclick="connectAnydesk('{{ workstation.anydesk }}')"
+                                            {% if company.active_contract == 0 %}disabled{% endif %}>Anydesk</button>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            {% if workstation.litemanager %}
+                            <div class="field has-addons is-centered">
+                                <div class="control is-expanded">
+                                    <input id="password-litemanager-{{ workstation.litemanager }}" class="input" type="password"
+                                           placeholder="Пароль" {% if company.active_contract == 0 %}disabled{% endif %}>
+                                </div>
+                                <div class="control">
+                                    <button class="button is-primary"
+                                            onclick="connectLitemanager('{{ workstation.litemanager }}')"
+                                            {% if company.active_contract == 0 %}disabled{% endif %}>Litemanager</button>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<!-- Ваши скрипты -->
+<script>
+    // Функции подключения остаются без изменений
+    function connectIiko(ipId) {
+        var passwordField = document.getElementById("password-iiko-" + ipId);
+        var password = passwordField.value;
+        var url = "clearbat://iiko@" + ipId + "@MH:" + password;
+        window.location.href = url;
+        passwordField.value = ""; // Очистка поля ввода
+    }
+
+    function connectTeamviewer(teamviewerId) {
+        var passwordField = document.getElementById("password-teamviewer-" + teamviewerId);
+        var password = passwordField.value;
+        var url = "clearbat://teamviewer@" + teamviewerId + ":" + password;
+        window.location.href = url;
+        passwordField.value = ""; // Очистка поля ввода
+    }
+
+    function connectAnydesk(anydeskId) {
+        var passwordField = document.getElementById("password-anydesk-" + anydeskId);
+        var password = passwordField.value;
+        var url = "clearbat://anydesk@" + anydeskId + ":" + password;
+        window.location.href = url;
+        passwordField.value = ""; // Очистка поля ввода
+    }
+
+    function connectLitemanager(litemanagerId) {
+        var passwordField = document.getElementById("password-litemanager-" + litemanagerId);
+        var password = passwordField.value;
+        var url = "clearbat://litemanager@" + litemanagerId + ":" + password;
+        window.location.href = url;
+        passwordField.value = ""; // Очистка поля ввода
+    }
+
+    // Функция для фильтрации компаний
+    document.getElementById('searchInput').addEventListener('input', filterCompanies);
+    document.getElementById('toggleInactive').addEventListener('change', filterCompanies);
+
+    function filterCompanies() {
+        let filter = document.getElementById('searchInput').value.toLowerCase();
+        let showInactive = document.getElementById('toggleInactive').checked;
+        let topLevelCompanyBlocks = document.querySelectorAll('.top-level-company');
+
+        topLevelCompanyBlocks.forEach(function(topBlock) {
+            let activeContract = topBlock.getAttribute('data-active-contract') === 'True';
+            let name = topBlock.getAttribute('data-company-name') || '';
+            let address = topBlock.getAttribute('data-company-address') || '';
+            let additional = topBlock.getAttribute('data-company-additional') || '';
+            let combinedText = name + ' ' + address + ' ' + additional;
+
+            let matches = combinedText.includes(filter);
+
+            // Проверяем дочерние компании
+            let childCompanyBlocks = topBlock.querySelectorAll('.child-company');
+            let childMatches = false;
+
+            childCompanyBlocks.forEach(function(childBlock) {
+                let childActiveContract = childBlock.getAttribute('data-active-contract') === "True";
+                let childName = childBlock.getAttribute('data-company-name') || '';
+                let childAddress = childBlock.getAttribute('data-company-address') || '';
+                let childAdditional = childBlock.getAttribute('data-company-additional') || '';
+                let childCombinedText = childName + ' ' + childAddress + ' ' + childAdditional;
+
+                let childShow = true;
+
+                if (!showInactive && !childActiveContract) {
+                    childShow = false;
+                }
+
+                if (childCombinedText.includes(filter) && childShow) {
+                    childBlock.classList.remove('is-hidden');
+                    childMatches = true;
+                } else {
+                    childBlock.classList.add('is-hidden');
+                }
+            });
+
+            let topShow = true;
+
+            if (!showInactive && !activeContract) {
+                topShow = false;
+            }
+
+            if ((matches || childMatches) && topShow) {
+                topBlock.classList.remove('is-hidden');
+            } else {
+                topBlock.classList.add('is-hidden');
+            }
+        });
+    }
+
+    // Инициализация при загрузке страницы
+    filterCompanies();
+</script>
+</body>
+</html>
